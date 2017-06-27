@@ -2309,7 +2309,7 @@
                     <history>30</history>
                     <trends>90</trends>
                     <status>0</status>
-                    <value_type>3</value_type>
+                    <value_type>0</value_type>
                     <allowed_hosts/>
                     <units>s</units>
                     <delta>0</delta>
