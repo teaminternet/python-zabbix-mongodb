@@ -45,7 +45,7 @@ def get_server_status(db):
 		    repl_data = member
 
 	        if member["state"] == 1:
-	    	    master_optime = member["optime"]["ts"].time
+	    	    master_optime = member["optimeDate"]
 
 		if member["_id"]:
 		    count += 1
@@ -158,12 +158,12 @@ def main():
 
             f.write('{host} {word}.{key} {value}\n'.format(host = hostname, word = keys['names'],key=i,value=text[i]))
 	for key, value in repl_data.iteritems():
-	    if key == "optime":
+	    if key == "optimeDate":
 	        key = "slaveLag"
                 if master_optime == -1:
                     lag = master_optime
                 else:
-                    lag = master_optime - value["ts"].time
+                    lag = abs(master_optime - value).seconds
 		value = lag
 	    # Print Debug output
 	    # print("Key %s Value %s" % (key, value))
