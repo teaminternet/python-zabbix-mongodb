@@ -4,10 +4,12 @@ import os
 import subprocess
 import socket
 import re
+import time
 
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
 from sys import argv
 from pprint import pprint
+from datetime import datetime
 #vars for Mongo
 USER = ''
 PASSWORD = ''
@@ -38,17 +40,25 @@ def get_server_status(db):
     if db!=0:
         try:
             data = db.command({"serverStatus":1})
-	    rs_members = db.command({"replSetGetStatus": 1})["members"]
-	    count = 1
-	    for member in rs_members:
-	        if "self" in member:
-		    repl_data = member
+	    repl_data = []
+	    try:
+	        rs_members = db.command({"replSetGetStatus": 1})["members"]
 
-	        if member["state"] == 1:
-	    	    master_optime = member["optimeDate"]
+	        count = 1
+	        for member in rs_members:
+	            if "self" in member:
+	                repl_data = member
 
-		if member["_id"]:
-		    count += 1
+	            if member["state"] == 1:
+	        	    master_optime = member["optimeDate"]
+
+	            if member["_id"]:
+	                count += 1
+            except errors.OperationFailure, e:
+                print "OK - Not running with replSet"
+                repl_data = {'Empty': 'Null'}
+	        master_optime = 0
+	        count = 0
 
             db.logout()
             try:
