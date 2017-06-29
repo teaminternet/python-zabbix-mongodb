@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 import subprocess
 import socket
 import re
@@ -15,6 +16,8 @@ USER = ''
 PASSWORD = ''
 hostname = socket.getfqdn()
 mongoconfig = '/etc/mongod.conf'
+pid = str(os.getpid())
+pidfile = "/tmp/mongo_trapper.pid"
 
 f = open(mongoconfig, 'r')
 for line in f:
@@ -23,6 +26,18 @@ for line in f:
 	configname, port = line.split(" ")
 
 HOST = 'mongodb://localhost:' + port + '/admin'
+
+def create_check_pid():
+    if os.path.isfile(pidfile):
+        old_pid = int(file(pidfile, 'r').read(10))
+        try:
+            os.kill(old_pid, 0)
+        except OSError:
+            os.unlink(pidfile)
+        else:
+            print "%s already exists, exiting" % pidfile
+            sys.exit()
+    file(pidfile, 'w').write(pid)
 
 def mongo_connect(HOST,USER,PASSWORD):
     client,db = 0,0
@@ -151,47 +166,53 @@ command= - command to execute aftef collecting data (it's empty as default)''')
             return(vals,keys)
 
 def main():
-    if len(argv)<2:
-        print('<Check arguments>')
-    else:
-        text = {}
-        vals,keys = chk_args(argv)
-        db = mongo_connect(HOST,USER,PASSWORD)
-        data, repl_data, master_optime, count = get_server_status(db)
-        for i in vals:
-            text[i] =get_val(data,i)
-        f = open(keys['out'],'w')
-        for i in text:
-	    # Avoid Division by zero and false postives
-	    if i == "metrics.repl.buffer.sizeBytes" and text[i] == 0:
-		text[i] = 1
+    create_check_pid()
+    try:
+        if len(argv)<2:
+            print('<Check arguments>')
+        else:
+            text = {}
+            vals,keys = chk_args(argv)
+            db = mongo_connect(HOST,USER,PASSWORD)
+            data, repl_data, master_optime, count = get_server_status(db)
+            for i in vals:
+                text[i] =get_val(data,i)
+            f = open(keys['out'],'w')
+            for i in text:
+                # Avoid Division by zero and false postives
+                if i == "metrics.repl.buffer.sizeBytes" and text[i] == 0:
+            	    text[i] = 1
 
-            f.write('{host} {word}.{key} {value}\n'.format(host = hostname, word = keys['names'],key=i,value=text[i]))
-	for key, value in repl_data.iteritems():
-	    if key == "optimeDate":
-	        key = "slaveLag"
-                if master_optime == -1:
-                    lag = master_optime
-                else:
-                    lag = abs(master_optime - value).seconds
-		value = lag
-	    # Print Debug output
-	    # print("Key %s Value %s" % (key, value))
-	    f.write('{host} mongodb_repl.self.{key} {value}\n'.format(host = hostname, key = key, value=value))
-        f.write('{host} mongodb.repl.hosts._length {value}\n'.format(host = hostname, value = count))
-        f.close()
-        #pprint(keys['command'])
-        if keys['command']!='' and keys['command']!=None:
-            try:
-                p = subprocess.Popen(keys['command'], shell = True, stdout = subprocess.PIPE)
-                s = ' '
-                while s:
-                    s = p.stdout.readline()
-                    print(s)
-                os.unlink(keys['out'])
-            except:
-                print('Error in running CMD')
-        exit()
+                f.write('{host} {word}.{key} {value}\n'.format(host = hostname, word = keys['names'],key=i,value=text[i]))
+            for key, value in repl_data.iteritems():
+                if key == "optimeDate":
+                    key = "slaveLag"
+
+		    if master_optime == -1:
+                        lag = master_optime
+                    else:
+                        lag = abs(master_optime - value).seconds
+            	        value = lag
+                # Print Debug output
+                # print("Key %s Value %s" % (key, value))
+                f.write('{host} mongodb_repl.self.{key} {value}\n'.format(host = hostname, key = key, value=value))
+            f.write('{host} mongodb.repl.hosts._length {value}\n'.format(host = hostname, value = count))
+            f.close()
+            #pprint(keys['command'])
+            if keys['command']!='' and keys['command']!=None:
+                try:
+                    p = subprocess.Popen(keys['command'], shell = True, stdout = subprocess.PIPE)
+                    s = ' '
+                    while s:
+                        s = p.stdout.readline()
+                        print(s)
+                    os.unlink(keys['out'])
+                except:
+                    print('Error in running CMD')
+	    exit()
+    finally:
+        os.unlink(pidfile)
+	print "Done"
 
 if __name__ == "__main__":
     main()
