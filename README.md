@@ -74,6 +74,12 @@ cp -av scripts/* /etc/zabbix/scripts
 cp -av zabbix_agentd.d/* /etc/zabbix/zabbix_agentd.d
 ```
     
+If you don't use User Authentication in mongodb it is recommended to remove the following line:
+```
+db.authenticate(USER,PASSWORD)
+```
+
+This will improve the performance additionally.
 
 Please make sure that you use the following setting in your zabbix_agend.conf
 ```
